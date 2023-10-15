@@ -1,0 +1,24 @@
+[Base]
+NAME = sample
+ENDPOINT = http://localhost/api
+
+[Auth]
+ENDPOINT = /login
+AUTHORISED_KEY = access_token
+BEARER_HEADER = 1
+
+[Path]
+SCENARIO = scenarios
+
+[Logging]
+#   CRITICAL = 50
+#   ERROR = 40
+#   WARNING = 30
+#   INFO = 20
+#   DEBUG = 10
+#   NOTSET = 0
+LEVEL = INFO
+DIR = logs
+FILE_NAME = log_%DATE%.log
+FORMAT = %(asctime)s-[%(name)s][%(levelname)s] %(message)s
+DATE_FORMAT = %Y-%m-%d %H:%M:%S

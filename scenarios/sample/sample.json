@@ -1,0 +1,28 @@
+{
+    "actions": [
+        {
+            "account_id": "123",
+            "api": {
+                "path": "/users/{id}",
+                "method": "get"
+            },
+            "in_path": {
+                "id": "123"
+            },
+            "payload": {}
+        },
+        {
+            "account_id": "124",
+            "api": {
+                "path": "/users/{id}",
+                "method": "put"
+            },
+            "in_path": {
+                "id": "124"
+            },
+            "payload": {
+                "nickname": null
+            }
+        }
+    ]
+}
