@@ -1,10 +1,12 @@
 import argparse
+import concurrent.futures
 import json
 import logging
+import logging.handlers
+import multiprocessing
 import os
 import sys
 from configparser import ConfigParser, ExtendedInterpolation
-from multiprocessing import Pool
 from pathlib import Path
 from time import strftime
 
@@ -14,17 +16,42 @@ APP_BASE = Path(__file__).parents[1]
 
 
 def _init_logger(conf: dict):
-    logging.basicConfig(
-        format=conf["FORMAT"],
-        datefmt=conf["DATE_FORMAT"],
-        level=conf["LEVEL"],
+    logger = logging.getLogger()
+    file_handler = logging.handlers.RotatingFileHandler(
         filename=f"{APP_BASE}/{conf['DIR']}/{conf['FILE_NAME']}".replace(
             "%DATE%", strftime("%Y%m%d")
-        ),
+        )
     )
+    formatter = logging.Formatter(conf["FORMAT"], conf["DATE_FORMAT"])
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
 
 
-def _exec_api(action):
+def logging_listener(queue, conf):
+    _init_logger(conf)
+    while True:
+        try:
+            record = queue.get()
+            if record is None:
+                break
+            logger = logging.getLogger(record.name)
+            logger.handle(record)
+        except Exception:
+            import sys
+            import traceback
+
+            traceback.print_exc(file=sys.stderr)
+
+
+def exec_api(action):
+    queue_handler = logging.handlers.QueueHandler(action["queue"])
+    logger = logging.getLogger()
+    logger.addHandler(queue_handler)
+    logger.setLevel(action["log_level"])
+
+    name = multiprocessing.current_process().name
+    logger.debug("Worker started: %s" % name)
+
     client = action["api_client"]
     client.execute(
         method=action["api"]["method"],
@@ -38,10 +65,10 @@ def execute():
     parser = argparse.ArgumentParser(description="Run api")
     parser.add_argument("scenario", type=str)
     parser.add_argument("--conf", type=str, default="apyclient")
-    parser.add_argument("--max_process", type=int, default=1)
+    parser.add_argument("--max_process", type=int, default=None)
     args = parser.parse_args()
 
-    if os.cpu_count() < args.max_process:
+    if args.max_process is not None and os.cpu_count() < args.max_process:
         sys.exit(f"In this environment, the number of CPUs is {os.cpu_count()}.")
 
     conf_path = APP_BASE / f"{args.conf}.cfg"
@@ -50,8 +77,6 @@ def execute():
 
     conf = ConfigParser(interpolation=ExtendedInterpolation())
     conf.read(conf_path)
-
-    _init_logger(conf["Logging"])
 
     # Load scenario
     scenario_dir = (
@@ -72,11 +97,14 @@ def execute():
     except FileNotFoundError as e:
         sys.exit(f"Not found accounts file ({accounts_file})")
 
+    queue = multiprocessing.Manager().Queue(-1)
+
     # Set api client to each actions
     api_clients = {}
     for act in actions:
         account = next(
-            account for account in accounts if account["id"] != act["account_id"]
+            (account for account in accounts if account["id"] != act["account_id"]),
+            None,
         )
         if account is None:
             sys.exit(f"Not found account {act['account_id']}")
@@ -96,11 +124,22 @@ def execute():
             )
 
         act["api_client"] = api_clients.get(act["account_id"])
+        act["queue"] = queue
+        act["log_level"] = conf["Logging"]["LEVEL"]
 
     # Run
-    with Pool(processes=args.max_process) as pool:
-        pool.map(_exec_api, iterable=actions)
+    listener = multiprocessing.Process(
+        target=logging_listener, args=(queue, conf["Logging"])
+    )
+    listener.start()
 
+    with concurrent.futures.ProcessPoolExecutor(
+        max_workers=args.max_process
+    ) as executer:
+        executer.map(exec_api, actions, timeout=60)
+
+    queue.put_nowait(None)
+    listener.join()
 
 if __name__ == "__main__":
     execute()

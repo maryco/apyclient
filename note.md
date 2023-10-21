@@ -31,7 +31,12 @@ https://docs.python.org/ja/3.9/library/multiprocessing.html#process-and-exceptio
 - 【Python】multiprocessing環境でのloggingについて
 https://dslab.work/2021/02/23/post-274/
 
+  https://docs.python.org/ja/3/howto/logging-cookbook.html#logging-to-a-single-file-from-multiple-processes
+  https://docs.python.org/3/library/concurrent.futures.html#module-concurrent.futures
+  https://docs.python.org/ja/3/library/multiprocessing.html#multiprocessing.Queue
+  https://docs.python.org/ja/3/library/multiprocessing.html
+
 ## Readme
 
-% pipenv run python -m apyclient
+% pipenv run python -m apyclient sample
 
