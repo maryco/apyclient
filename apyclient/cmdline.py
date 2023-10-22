@@ -43,8 +43,42 @@ def logging_listener(queue, conf):
             traceback.print_exc(file=sys.stderr)
 
 
-def exec_api(action):
-    queue_handler = logging.handlers.QueueHandler(action["queue"])
+def prepare_actions(actions, accounts, logging_queue, conf: ConfigParser):
+    """
+    Set api client and logging settings to each actions
+    """
+    api_clients = {}
+    for act in actions:
+        account = next(
+            (account for account in accounts if account["id"] != act["account_id"]),
+            None,
+        )
+        if account is None:
+            sys.exit(f"Not found account {act['account_id']}")
+
+        # Initialize api client for each account
+        if api_clients.get(act["account_id"]) is None:
+            endpoint = conf.get("Base", "ENDPOINT")
+            api_clients[act["account_id"]] = ApiClient(
+                endpoint=endpoint,
+                account=account,
+                should_autorize=conf.getboolean("Auth", "BEARER_HEADER"),
+                auth=AuthClient(
+                    auth_endpoint=conf.get("Auth", "ENDPOINT"),
+                    authorized_key=conf.get("Auth", "AUTHORISED_KEY"),
+                    base_endpoint=endpoint,
+                ),
+            )
+
+        act["api_client"] = api_clients.get(act["account_id"])
+        act["log_queue"] = logging_queue
+        act["log_level"] = conf["Logging"]["LEVEL"]
+
+    pass
+
+
+def execute_api(action):
+    queue_handler = logging.handlers.QueueHandler(action["log_queue"])
     logger = logging.getLogger()
     logger.addHandler(queue_handler)
     logger.setLevel(action["log_level"])
@@ -79,10 +113,8 @@ def execute():
     conf.read(conf_path)
 
     # Load scenario
-    scenario_dir = (
-        f"{APP_BASE}/{conf.get('Path', 'SCENARIO')}/{conf.get('Base', 'NAME')}"
-    )
-    scenario = f"{scenario_dir}/{args.scenario}"
+    scenario_dir = f"{APP_BASE}/{conf.get('Path', 'SCENARIO')}/{conf.get('Base', 'COLLECTION_NAME')}"
+    scenario = f"{scenario_dir}/{args.scenario}.json"
     try:
         with open(scenario, "r") as fp:
             actions = json.load(fp)["actions"]
@@ -99,35 +131,9 @@ def execute():
 
     queue = multiprocessing.Manager().Queue(-1)
 
-    # Set api client to each actions
-    api_clients = {}
-    for act in actions:
-        account = next(
-            (account for account in accounts if account["id"] != act["account_id"]),
-            None,
-        )
-        if account is None:
-            sys.exit(f"Not found account {act['account_id']}")
+    prepare_actions(actions, accounts, logging_queue=queue, conf=conf)
 
-        # Initialize api client for each account
-        if api_clients.get(act["account_id"]) is None:
-            endpoint = conf.get("Base", "ENDPOINT")
-            api_clients[act["account_id"]] = ApiClient(
-                endpoint=endpoint,
-                account=account,
-                should_autorize=conf.getboolean("Auth", "BEARER_HEADER"),
-                auth=AuthClient(
-                    auth_endpoint=conf.get("Auth", "ENDPOINT"),
-                    authorized_key=conf.get("Auth", "AUTHORISED_KEY"),
-                    base_endpoint=endpoint,
-                ),
-            )
-
-        act["api_client"] = api_clients.get(act["account_id"])
-        act["queue"] = queue
-        act["log_level"] = conf["Logging"]["LEVEL"]
-
-    # Run
+    # Start logging listener and execute each actions
     listener = multiprocessing.Process(
         target=logging_listener, args=(queue, conf["Logging"])
     )
@@ -136,10 +142,11 @@ def execute():
     with concurrent.futures.ProcessPoolExecutor(
         max_workers=args.max_process
     ) as executer:
-        executer.map(exec_api, actions, timeout=60)
+        executer.map(execute_api, actions, timeout=60)
 
     queue.put_nowait(None)
     listener.join()
+
 
 if __name__ == "__main__":
     execute()

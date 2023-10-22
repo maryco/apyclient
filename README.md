@@ -5,4 +5,4 @@
 
 ## Run
 
-> pipenv run python -m apyclient sample.json
+> pipenv run python -m apyclient sample

@@ -1,5 +1,5 @@
 [Base]
-NAME = sample
+COLLECTION_NAME = sample
 ENDPOINT = http://localhost/api
 
 [Auth]
