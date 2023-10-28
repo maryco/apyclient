@@ -21,7 +21,7 @@ class ApiClient:
         self.endpoint = endpoint
         self.actor = account
         if should_autorize:
-            auth_key = auth(id=account["id"], password=account["password"])
+            auth_key = auth(auth_id=account["auth_id"], password=account["password"])
             self.headers = {"Authorization": "Bearer {}".format(auth_key)}
         else:
             self.headers = None

@@ -16,13 +16,13 @@ class AuthClient:
         self.authorized_key = authorized_key
         self.state = None
 
-    def __call__(self, id: Any, password: str, **kwds: Any) -> Any:
+    def __call__(self, auth_id: Any, password: str, **kwds: Any) -> Any:
         self._get_auth_url()
         if self.state is None:
             raise ValueError("")
 
         r = requests.get(
-            f"{self.auth_endpoint}?code=dummycode&state={self.state}&user_id={id}"
+            f"{self.auth_endpoint}?code=dummycode&state={self.state}&user_id={auth_id}"
         )
         r.raise_for_status()
 

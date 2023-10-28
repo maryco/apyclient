@@ -49,11 +49,11 @@ def prepare_actions(actions, accounts, logging_queue, conf: ConfigParser):
     """
     api_clients = {}
     for act in actions:
-        account = next(
-            (account for account in accounts if account["id"] != act["account_id"]),
+        actor = next(
+            (actor for actor in accounts if actor["id"] == act["account_id"]),
             None,
         )
-        if account is None:
+        if actor is None:
             sys.exit(f"Not found account {act['account_id']}")
 
         # Initialize api client for each account
@@ -61,7 +61,7 @@ def prepare_actions(actions, accounts, logging_queue, conf: ConfigParser):
             endpoint = conf.get("Base", "ENDPOINT")
             api_clients[act["account_id"]] = ApiClient(
                 endpoint=endpoint,
-                account=account,
+                account=actor,
                 should_autorize=conf.getboolean("Auth", "BEARER_HEADER"),
                 auth=AuthClient(
                     auth_endpoint=conf.get("Auth", "ENDPOINT"),

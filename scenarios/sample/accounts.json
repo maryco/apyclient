@@ -1,7 +1,8 @@
 {
     "accounts": [
         {
-            "id": 1,
+            "id": "1",
+            "auth_id": "1",
             "password": "secret01"
         }
     ]
