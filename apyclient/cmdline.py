@@ -6,6 +6,7 @@ import logging.handlers
 import multiprocessing
 import os
 import sys
+import traceback
 from configparser import ConfigParser, ExtendedInterpolation
 from pathlib import Path
 from time import strftime
@@ -37,15 +38,12 @@ def logging_listener(queue, conf):
             logger = logging.getLogger(record.name)
             logger.handle(record)
         except Exception:
-            import sys
-            import traceback
-
             traceback.print_exc(file=sys.stderr)
 
 
 def prepare_actions(actions, accounts, logging_queue, conf: ConfigParser):
     """
-    Set api client and logging settings to each actions
+    Set api client and logger to each actions
     """
     api_clients = {}
     for act in actions:
@@ -134,10 +132,10 @@ def execute():
     prepare_actions(actions, accounts, logging_queue=queue, conf=conf)
 
     # Start logging listener and execute each actions
-    listener = multiprocessing.Process(
+    logging_listener = multiprocessing.Process(
         target=logging_listener, args=(queue, conf["Logging"])
     )
-    listener.start()
+    logging_listener.start()
 
     with concurrent.futures.ProcessPoolExecutor(
         max_workers=args.max_process
@@ -145,7 +143,7 @@ def execute():
         executer.map(execute_api, actions, timeout=60)
 
     queue.put_nowait(None)
-    listener.join()
+    logging_listener.join()
 
 
 if __name__ == "__main__":

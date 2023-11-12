@@ -7,7 +7,7 @@
 * 3.11.2
 
 % pip install pipenv
-% pipenv install --python=3.11
+% pipenv install --python=3.11.2
 
 ### requirements
 
